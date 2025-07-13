@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node --max-old-space-size=2048 server.js",
-    "dev": "nodemon --exec \"node --max-old-space-size=8192\" server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "start": "node --max-old-space-size=512 server.js",
+  "dev": "nodemon --exec \"node --max-old-space-size=512\" server.js",
+  "test": "echo \"Error: no test specified\" && exit 1"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
