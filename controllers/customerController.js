@@ -99,7 +99,7 @@ const processCSV = async (filePath) => {
   return new Promise((resolve, reject) => {
     const stream = fs.createReadStream(filePath);
     const parser = csv.parse({ headers: true });
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 1000;
     let buffer = [];
     let count = 0;
 
