@@ -99,20 +99,24 @@ const processCSV = async (filePath) => {
   return new Promise((resolve, reject) => {
     const stream = fs.createReadStream(filePath);
     const parser = csv.parse({ headers: true });
-    const BATCH_SIZE = 10;
+
+    const BATCH_SIZE = 1000;
     let buffer = [];
     let count = 0;
 
     resetProgress();
     setProgress({ status: 'processing', total: 0, current: 0 });
 
-    parser
-      .on('error', (error) => {
-        fs.unlinkSync(filePath);
-        setProgress({ status: 'error' });
-        reject(error);
-      })
-      .on('data', (row) => {
+    const pipeline = stream.pipe(parser);
+
+    pipeline.on('error', (error) => {
+      fs.unlinkSync(filePath);
+      setProgress({ status: 'error' });
+      reject(error);
+    });
+
+    (async () => {
+      for await (const row of pipeline) {
         buffer.push(row);
         count++;
 
@@ -121,39 +125,32 @@ const processCSV = async (filePath) => {
         }
 
         if (buffer.length >= BATCH_SIZE) {
-          stream.pause();
-          Customer.insertMany(buffer, { ordered: false })
-            .then(() => {
-              buffer = [];
-              stream.resume();
-            })
-            .catch((err) => {
-              console.error('Error insertMany (batch)', err.message);
-              stream.resume();
-            });
+          try {
+            await Customer.insertMany(buffer, { ordered: false });
+            buffer = [];
+          } catch (err) {
+            console.error('Error insertMany (batch)', err.message);
+            buffer = [];
+          }
         }
-      })
-      .on('end', () => {
-        if (buffer.length > 0) {
-          Customer.insertMany(buffer, { ordered: false })
-            .then(() => {
-              fs.unlinkSync(filePath);
-              setProgress({ status: 'done', current: count });
-              resolve();
-            })
-            .catch((err) => {
-              console.error('Error insertMany (last batch)', err.message);
-              fs.unlinkSync(filePath);
-              setProgress({ status: 'done', current: count });
-              resolve();
-            });
-        } else {
-          fs.unlinkSync(filePath);
-          setProgress({ status: 'done', current: count });
-          resolve();
-        }
-      });
+      }
 
-    stream.pipe(parser);
+      // Insert sisa buffer
+      if (buffer.length > 0) {
+        try {
+          await Customer.insertMany(buffer, { ordered: false });
+        } catch (err) {
+          console.error('Error insertMany (last batch)', err.message);
+        }
+      }
+
+      fs.unlinkSync(filePath);
+      setProgress({ status: 'done', current: count });
+      resolve();
+    })().catch((err) => {
+      fs.unlinkSync(filePath);
+      setProgress({ status: 'error' });
+      reject(err);
+    });
   });
 };
